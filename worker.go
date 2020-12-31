@@ -43,13 +43,15 @@ func (w *Worker) Run() {
     defer w.Done()
   }()
   go w.loop(interrupt)
-  w.Wait()
 }
 
 func (w *Worker) Add() {
   w.wg.Add(1)
 }
 
+func (w *Worker) Send(url string) {
+  w.job <- url
+}
 
 func (w *Worker) Wait() {
   w.wg.Wait()
