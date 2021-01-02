@@ -9,10 +9,11 @@ import (
 	"syscall"
 )
 
-const (
-  workerLimit = 3
-  jobLimit = 1000
-)
+type Config struct {
+  url string
+  workerLimit int
+  jobLimit int
+}
 
 type Job chan string
 
@@ -21,12 +22,15 @@ type Worker struct {
   sem chan struct{}
   job Job
   dis Dispatcher
+  domain string
+  mux sync.RWMutex
+  visited map[string] struct{}
 }
 
-func NewWorker(d Dispatcher) *Worker {
+func NewWorker(d Dispatcher,config Config) *Worker {
   return &Worker{
-    sem: make(chan struct{},workerLimit),
-    job: make(Job,jobLimit),
+    sem: make(chan struct{},config.workerLimit),
+    job: make(Job,config.jobLimit),
     dis:d,
   }
 }
@@ -75,8 +79,18 @@ loop:
           wg.Done() 
           <-w.sem
         }()
-        if err := w.dis.exec(d); err!= nil {
-          log.Printf("ERROR:%s",err)
+        data,err := w.dis.exec(job)
+        if err != nil {
+          log.Println(err)
+          return
+        }
+        if data == nil {
+          return
+        }
+        if d,ok := data.([]string); ok {
+          for _,s := range d {
+            w.Send(s)
+          }
         }
       }(job)
     }
