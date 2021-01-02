@@ -1,7 +1,7 @@
 package crawler
 
 type Dispatcher interface {
-  exec(url string) (interface{},error)
+  exec(url urlStr) (interface{},error)
 }
 
 

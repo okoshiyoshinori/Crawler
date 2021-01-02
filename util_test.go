@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-
-
 func TestToAbsUrl(m *testing.T) {
   base,_ := url.Parse("http://google.co.jp")
   path := "../ookoshi/ooko"

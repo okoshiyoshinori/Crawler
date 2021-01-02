@@ -15,12 +15,12 @@ type Config struct {
   jobLimit int
 }
 
-type Job chan string
+//type Job chan string
 
 type Worker struct {
   wg sync.WaitGroup
   sem chan struct{}
-  job Job
+  job chan urlStr
   dis Dispatcher
   domain string
   mux sync.RWMutex
@@ -30,7 +30,7 @@ type Worker struct {
 func NewWorker(d Dispatcher,config Config) *Worker {
   return &Worker{
     sem: make(chan struct{},config.workerLimit),
-    job: make(Job,config.jobLimit),
+    job: make(chan urlStr,config.jobLimit),
     dis:d,
   }
 }
@@ -53,7 +53,7 @@ func (w *Worker) Add() {
   w.wg.Add(1)
 }
 
-func (w *Worker) Send(url string) {
+func (w *Worker) Send(url urlStr) {
   w.job <- url
 }
 
@@ -74,7 +74,7 @@ loop:
     case job := <-w.job:
       w.sem <- struct{}{}
       wg.Add(1)
-      go func(d string) {
+      go func(d urlStr) {
         defer func() { 
           wg.Done() 
           <-w.sem
@@ -87,7 +87,7 @@ loop:
         if data == nil {
           return
         }
-        if d,ok := data.([]string); ok {
+        if d,ok := data.([]urlStr); ok {
           for _,s := range d {
             w.Send(s)
           }
