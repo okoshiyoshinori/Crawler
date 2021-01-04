@@ -1,3 +1,6 @@
 package crawler
 
-type urlStr string
+type link struct {
+  url string
+  depth int
+}

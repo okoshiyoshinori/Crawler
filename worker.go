@@ -19,12 +19,12 @@ type config struct {
 }
 
 func NewConfig(ustr string,depth int,wlimit int,jlimit int) *config {
-  tmp,err := url.Parse(ustr)
+  p,err := url.Parse(ustr)
   if err != nil {
-    panic("FATAL:not string")
+    panic("FATAL:Can't parse this url")
   }
   return &config{
-    base:tmp,
+    base:p,
     depth:depth,
     workerLimit:wlimit,
     jobLimit:jlimit,
@@ -35,17 +35,19 @@ type worker struct {
   config *config
   wg sync.WaitGroup
   sem chan struct{}
-  job chan urlStr
+  job chan link
   dis Dispatcher
   mux sync.RWMutex
-  visited map[urlStr] struct{}
+  visited map[string] struct{}
 }
 
-func NewWorker(d Dispatcher,config config) *worker {
+func NewWorker(d Dispatcher,c *config) *worker {
   return &worker{
-    sem: make(chan struct{},config.workerLimit),
-    job: make(chan urlStr,config.jobLimit),
+    config: c,
+    sem: make(chan struct{},c.workerLimit),
+    job: make(chan link,c.jobLimit),
     dis:d,
+    visited:make(map[string]struct{}),
   }
 }
 
@@ -67,9 +69,9 @@ func (w *worker) Add() {
   w.wg.Add(1)
 }
 
-func (w *worker) Send(url urlStr) {
-  w.visitedWrite(url)
-  w.job <- url
+func (w *worker) Send(l link) {
+  w.visitedWrite(l)
+  w.job <- l
 }
 
 func (w *worker) Wait() {
@@ -80,27 +82,54 @@ func (w *worker) Done() {
   w.wg.Done()
 }
 
-func (w *worker) visitedWrite(url urlStr) {
-  w.mux.Lock()
-  defer w.mux.Unlock()
-  if _,ok :=w.visited[url]; ok {
-    return
+func (w *worker) getLink(l link) ([]link,error) {
+  next_depth := l.depth + 1
+  //絶対パスに変換
+  u,_ := ToAbsUrl(w.config.base,l.url)
+  links,err := w.dis.exec(u)
+  if err != nil {
+    return nil,err
   }
-  w.visited[url] = struct{}{}
+
+  if links == nil {
+    return nil,nil
+  }
+
+  var t []link
+  for _,s := range links {
+    tmp := link{
+      depth: next_depth,
+      url:s,
+    }
+    t = append(t,tmp)
+  }
+  return t,nil
 }
 
-func (w *worker) isVisited(url urlStr) bool {
+func (w *worker) visitedWrite(l link) {
+  w.mux.Lock()
+  defer w.mux.Unlock()
+  if _,ok :=w.visited[l.url]; ok {
+    return
+  }
+  w.visited[l.url] = struct{}{}
+}
+
+func (w *worker) isVisited(l link) bool {
   w.mux.RLock()
   defer w.mux.RUnlock()
-  _,ok := w.visited[url]
+  _,ok := w.visited[l.url]
   return ok 
 }
 
-func (w *worker) isSend(u urlStr) bool {
-  if w.isVisited(u) {
+func (w *worker) isSend(l link) bool {
+  if w.isVisited(l) {
     return false
   }
-  if !strings.Contains(string(u),w.config.base.Host) {
+  if !strings.Contains(l.url,w.config.base.Host) {
+    return false
+  }
+  if l.depth > w.config.depth {
     return false
   }
   return true
@@ -116,33 +145,24 @@ loop:
     case job := <-w.job:
       w.sem <- struct{}{}
       wg.Add(1)
-      go func(d urlStr) {
+      go func(d link) {
         defer func() { 
           wg.Done() 
           <-w.sem
         }()
-
-        data,err := w.dis.exec(job)
+        data,err := w.getLink(job)
         if err != nil {
           log.Println(err)
           return
         }
-        if data == "" {
+        if data == nil {
           return
         }
-        if d,ok := data.([]urlStr); ok {
-          for _,s := range d {
-            if !w.isSend(s) {
-              continue
-            }
-            w.Send(s)
-          }
-        } else {
-          s,_ := data.(urlStr)
+        for _,s := range data {
           if !w.isSend(s) {
-            return
+             continue
           }
-          w.Send(s)
+            w.Send(s)
         }
       }(job)
     }
