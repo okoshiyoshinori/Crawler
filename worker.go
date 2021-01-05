@@ -84,9 +84,7 @@ func (w *worker) Done() {
 
 func (w *worker) getLink(l link) ([]link,error) {
   next_depth := l.depth + 1
-  //絶対パスに変換
-  u,_ := ToAbsUrl(w.config.base,l.url)
-  links,err := w.dis.exec(u)
+  links,err := w.dis.exec(l.url)
   if err != nil {
     return nil,err
   }
@@ -97,9 +95,13 @@ func (w *worker) getLink(l link) ([]link,error) {
 
   var t []link
   for _,s := range links {
+    e,err := ToAbsUrl(w.config.base,s)
+    if err != nil {
+      continue
+    }
     tmp := link{
       depth: next_depth,
-      url:s,
+      url:e,
     }
     t = append(t,tmp)
   }
