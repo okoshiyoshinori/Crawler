@@ -63,6 +63,11 @@ func (w *worker) Run() {
     defer w.Done()
   }()
   go w.loop(interrupt)
+  tmp := link{
+    depth:TOPDEPTH,
+    url:w.config.base.String(),
+  }
+  w.Send(tmp)
 }
 
 func (w *worker) Add() {
@@ -128,7 +133,7 @@ func (w *worker) isSend(l link) bool {
   if w.isVisited(l) {
     return false
   }
-  if !strings.Contains(l.url,w.config.base.Host) {
+  if !strings.Contains(l.url,w.config.base.Hostname()) {
     return false
   }
   if l.depth > w.config.depth {
