@@ -89,7 +89,7 @@ func (w *worker) Done() {
 
 func (w *worker) getLink(l link) ([]link,error) {
   next_depth := l.depth + 1
-  links,err := w.dis.exec(l.url)
+  links,err := w.dis.Exec(l.url)
   if err != nil {
     return nil,err
   }

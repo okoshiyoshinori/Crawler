@@ -14,9 +14,9 @@ type Display struct {}
 var count int = 0
 var mux sync.RWMutex
 
-func (d *Display) exec(url string) ([]string,error) {
+func (d *Display) Exec(url string) ([]string,error) {
   time.Sleep(1000 * time.Millisecond)
-  //fmt.Printf("start:%s\n",url)
+  fmt.Printf("start:%s\n",url)
   doc,err := goquery.NewDocument(url)
   if err != nil {
     return nil,err
@@ -36,7 +36,7 @@ func (d *Display) exec(url string) ([]string,error) {
    in2.Each(func(index int,s *goquery.Selection){
      data += "," + s.Text()
    })
-   fmt.Println(data)
+   //fmt.Println(data)
   })
 
   var links []string 
